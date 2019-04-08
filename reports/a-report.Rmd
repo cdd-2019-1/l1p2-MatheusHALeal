@@ -7,6 +7,8 @@ theme: sandstone
 ---
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(readr)
+library(colorspace)
 library(tidyverse)
 source(here::here("code/lib.R"))
 theme_set(theme_bw())
@@ -15,3 +17,74 @@ theme_set(theme_bw())
 ```{r read}
 atividade = read_projectdata()
 ```
+
+```{r}
+
+atvd1 <- atividade %>%  arrange(-seguidores) %>%
+  slice(1:10) %>%
+  na.omit(.)
+
+ggplot(data=atvd1, aes(x=reorder(nome_eleitoral, seguidores), y=as.factor(seguidores), color = partido)) +
+  geom_bar(stat="identity", fill="white")+
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Os 10 parlamentares mais seguidos no Twitter" , x = "Parlamentares", y = "Seguidores")
+```
+
+```{r}
+atvd2 <- atividade %>% group_by(partido) %>%  na.omit(.) %>% 
+  summarise(seg = sum(seguidores)) %>% 
+  arrange(-seg) %>% slice(1:10)
+
+ggplot(data=atvd2, aes(x=reorder(partido, seg), y=as.factor(seg), color = partido)) +
+  geom_bar(stat="identity", fill="white")+
+  theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Os 10 partidos mais seguidos no Twitter" , x = "Partidos", y = "Seguidores")
+
+```
+
+```{r}
+require(gridExtra)
+library(scales)
+
+atvd3 <- atividade %>%  arrange(-seguidores) %>% slice(1:10) %>% na.omit(.)
+
+get_plot_qst_3 <- function(yVar, title, yLab, yScaleUnity, yScaleRound, mpoint) {
+  
+  y.min = 0
+  y.max = max(yVar)
+  y.padding = ifelse(yScaleUnity == "k", 1e+3, 1e+6) * 0.5
+  
+  plot = atvd3 %>% 
+    mutate(nome_eleitoral = reorder(nome_eleitoral, -yVar)) %>%    
+    ggplot(aes(nome_eleitoral, yVar, fill = yVar)) +
+    scale_fill_gradient2(low = "darkred", high = "deepskyblue2", mid="darkorchid1", midpoint = mpoint,space = "Lab") +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label=nome_eleitoral), hjust=-0.25, angle=90, color="black", size=2.5) +
+    scale_y_continuous(label = unit_format(unit = yScaleUnity, scale = yScaleRound),
+                       limits = c(y.min, y.max + y.padding)) + 
+    theme_minimal() +  
+
+    
+    labs(title=title, x ="Parlamentar", y = yLab) +
+    theme(legend.position = "NA",
+          axis.text.x = element_text(size=6.5),
+          axis.ticks.x = element_blank()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  return(plot)
+}
+
+# Reusando a função acima para gerar gráficos
+plot1 = get_plot_qst_3(atvd3$seguidores, title = "Popularidade", 
+                       yLab = "Seguidores", yScaleUnity = "m", yScaleRound = 1e-6, 800000)
+
+atvd3$n_proprio <- as.numeric(atvd3$n_proprio)
+atvd3$n_retweet <- as.numeric(atvd3$n_retweet)
+atvd3$n_proprio<- as.numeric(as.character(atvd3$n_proprio))
+atvd3$n_retweet <- as.numeric(as.character(atvd3$n_retweet))
+
+atvd3$atividade <- atvd3$n_proprio + atvd3$n_retweet 
+
+plot2 = get_plot_qst_3(atvd3$atividade, title = "Atividade", 
+                       yLab = "Tweets", yScaleUnity = "k", yScaleRound = 1e-6, 250)
+
+grid.arrange(plot1, plot2, ncol=2)
+```
+
