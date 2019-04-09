@@ -1,10 +1,21 @@
 ---
-title: "REPLACE ME"
+title: "Tweets dos congressitas brasileiros em 2019"
+author: "Matheus Leal"
+date: 08 de Abril, 2019
 output:
     html_document:
-    df_print: paged
+      df_print: paged
+      toc: yes
+      toc_float: yes
+    html_notebook:
+      toc: yes
+      toc_float: yes
 theme: sandstone
 ---
+
+##Contextualização
+
+Nesta análise iremos explorar dados sobre as contas do Twitter de nossos representantes federais em 2019. Os dados brutos têm 72.316 tweets cuja data de criação segundo a API é em 2019. Esses tweets foram coletados em 22 de março de 2019.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 library(readr)
@@ -13,12 +24,19 @@ library(tidyverse)
 source(here::here("code/lib.R"))
 theme_set(theme_bw())
 ```
+De início, iremos carregar os dados:
 
 ```{r read}
 atividade = read_projectdata()
 ```
 
-```{r}
+##Perguntas
+
+###1.Quem são as "celebridades" do congresso?
+
+Para responder essa pergunta, iremos considerar "celebridade" aqueles com muitos seguidores, especialmente os 10 mais seguidos do parlamento. Vamos também descobrir a qual partido pertecem. Vejamos o gráfico que pode nos ajudar a responder essa pergunta:
+
+```{r message=FALSE, warning=FALSE}
 
 atvd1 <- atividade %>%  arrange(-seguidores) %>%
   slice(1:10) %>%
@@ -29,7 +47,13 @@ ggplot(data=atvd1, aes(x=reorder(nome_eleitoral, seguidores), y=as.factor(seguid
   theme_minimal() + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + labs(title = "Os 10 parlamentares mais seguidos no Twitter" , x = "Parlamentares", y = "Seguidores")
 ```
 
-```{r}
+A primeira coisa que podemos notar, é que os nomes que surgem como os mais seguidos são personalidades "polêmicas", estas que estão frequentemente em destaque na mídia, como o filho do presidente, Flávio Bolsonaro. Outra coisa que observamos é que, dos parlamentares presentes no top 10, temos 7 partidos, o que *pode* indicar que, neste contexto, o indivíduo é mais importante na visão dos seguidores que seu partido. Os únicos partidos com mais de um parlamentar presente no top 10 são o PSOL, com 2, e o PODE, com 3. O que nos leva à próxima pergunta.
+
+###2. Quais são, então, os partidos com mais seguidores?
+
+Como estamos utilizando as contas pessoais dos parlamentares e não as dos respectivos partidos, vamos agrupá-los, somando seus seguidores.
+
+```{r message=FALSE, warning=FALSE}
 atvd2 <- atividade %>% group_by(partido) %>%  na.omit(.) %>% 
   summarise(seg = sum(seguidores)) %>% 
   arrange(-seg) %>% slice(1:10)
@@ -40,7 +64,13 @@ ggplot(data=atvd2, aes(x=reorder(partido, seg), y=as.factor(seg), color = partid
 
 ```
 
-```{r}
+Aqui temos algumas informações interessantes. Primeiro, José Serra, embora seja o segundo parlamentar mais seguido, com quase 1.5 milhões de seguidores, seu partido (PSDB) não tem o mesmo impacto, tendo pouco menos de 1.8 milhões de seguidores. O PODE, que possui 3 das dos parlamentares mais seguidos, se mostra também como aquele que soma mais seguidores. Também temos o fato de que o PSL, com apenas um representante no top 10 (Flávio Bolsonaro), soma mais que o dobro de seguidores deste.
+
+###3. Qual a relação entre a atividade dos parlamentares e sua popularidade?
+
+Queremos saber se a atividade dos parlamentares no Twitter tem alguma relação com sua popularidade. Diferente da primeira pergunta, vamos considerar como parâmetro para popularidade, tanto a quantidade de seguidores, quanto o engajamento (curtidas e retweets) que os congressistas recebem.
+
+```{r message=FALSE, warning=FALSE}
 require(gridExtra)
 library(scales)
 
@@ -54,15 +84,13 @@ get_plot_qst_3 <- function(yVar, title, yLab, yScaleUnity, yScaleRound, mpoint) 
   
   plot = atvd3 %>% 
     mutate(nome_eleitoral = reorder(nome_eleitoral, -yVar)) %>%    
-    ggplot(aes(nome_eleitoral, yVar, fill = yVar)) +
+    ggplot(aes(x = reorder(nome_eleitoral, yVar), y = yVar, fill = yVar)) +
     scale_fill_gradient2(low = "darkred", high = "deepskyblue2", mid="darkorchid1", midpoint = mpoint,space = "Lab") +
     geom_bar(stat = "identity") +
     geom_text(aes(label=nome_eleitoral), hjust=-0.25, angle=90, color="black", size=2.5) +
     scale_y_continuous(label = unit_format(unit = yScaleUnity, scale = yScaleRound),
                        limits = c(y.min, y.max + y.padding)) + 
-    theme_minimal() +  
-
-    
+    theme_minimal() + 
     labs(title=title, x ="Parlamentar", y = yLab) +
     theme(legend.position = "NA",
           axis.text.x = element_text(size=6.5),
@@ -71,9 +99,8 @@ get_plot_qst_3 <- function(yVar, title, yLab, yScaleUnity, yScaleRound, mpoint) 
   return(plot)
 }
 
-# Reusando a funÃ§Ã£o acima para gerar grÃ¡ficos
 plot1 = get_plot_qst_3(atvd3$seguidores, title = "Popularidade", 
-                       yLab = "Seguidores", yScaleUnity = "m", yScaleRound = 1e-6, 800000)
+                       yLab = "Seguidores", yScaleUnity = "m", yScaleRound = 1e-6, median(atvd3$seguidores))
 
 atvd3$n_proprio <- as.numeric(atvd3$n_proprio)
 atvd3$n_retweet <- as.numeric(atvd3$n_retweet)
@@ -83,8 +110,57 @@ atvd3$n_retweet <- as.numeric(as.character(atvd3$n_retweet))
 atvd3$atividade <- atvd3$n_proprio + atvd3$n_retweet 
 
 plot2 = get_plot_qst_3(atvd3$atividade, title = "Atividade", 
-                       yLab = "Tweets", yScaleUnity = "k", yScaleRound = 1e-6, 250)
+                       yLab = "Tweets", yScaleUnity = "k", yScaleRound = 1e-3, median(atvd3$atividade))
 
-grid.arrange(plot1, plot2, ncol=2)
+plot3 = get_plot_qst_3(atvd3$engaj_total, title = "Engajamento", 
+                       yLab = "Curtidas e Retweets", yScaleUnity = "m", yScaleRound = 1e-6, median(atvd3$engaj_total))
+
+grid.arrange(plot1, plot2, plot3, ncol=3)
 ```
 
+De cara vemos que, embora Romário seja o mais seguido, como não possui tanta atividade, também não tem muito engajamento. Comportamento que observamos também com José Serra. Podemos também destacar que Alvaro Dias, mesmo sendo o mais ativo, está em último lugar se levarmos em conta o número de seguidores, além de mostrar um engajamento mediano com relação aos outros. Já Marcelo Freixo, com quase o mesmo nível de atividade, parece se sair melhor, tanto no engajamento, quanto na quantidade de seguidores. Apenas com o gráfico, podemos inferir que a atividade não parece ter tanta influência na quantidade de seguidores, mas consegue gerar um maior engajamento.
+
+###4. E quando levamos em consideração os partidos, como fica essa relação?
+
+Pra concluir nossa exploração, vamos tentar ver se o mesmo comportamento se repete quando observamos os partidos.
+
+```{r message=FALSE, warning=FALSE}
+require(gridExtra)
+library(scales)
+
+
+
+get_plot_qst_4 <- function(yVar, title, yLab, yScaleUnity, yScaleRound, mpoint, data) {
+  y.min = 0
+  y.max = max(yVar)
+  y.padding = ifelse(yScaleUnity == "k", 1e+3, 1e+6) * 0.5
+  
+  plot = data %>% 
+    mutate(part = reorder(partido, -yVar)) %>%    
+    ggplot(aes(x= reorder(partido, yVar), y = yVar, fill = yVar)) +
+    scale_fill_gradient2(low = "darkred", high = "deepskyblue2", mid="darkorchid1", midpoint = mpoint, space = "Lab") +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label=partido), hjust=-0.25, angle=90, color="black", size=2.5) +
+    scale_y_continuous(label = unit_format(unit = yScaleUnity, scale = yScaleRound),
+                       limits = c(y.min, y.max + y.padding)) + 
+    theme_minimal() + labs(title=title, x ="Partido", y = yLab) +
+    theme(legend.position = "NA",
+          axis.text.x = element_text(size=6.5),
+          axis.ticks.x = element_blank()) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  return(plot)
+}
+
+
+atvd4 <- atividade %>% group_by(partido)%>% na.omit(.) %>% summarise(seg = sum(seguidores)) %>%  arrange(-seg) %>% slice(1:10)
+atvd5 <- atividade %>% group_by(partido)%>% na.omit(.) %>% summarise(atvd = sum(n_proprio) + sum(n_retweet)) %>%  arrange(-atvd) %>% slice(1:10)
+atvd6 <- atividade %>% group_by(partido)%>% na.omit(.) %>% summarise(engaj = sum(engaj_total)) %>%  arrange(-engaj) %>% slice(1:10)
+
+plot1 = get_plot_qst_4(atvd4$seg, title = "Popularidade", yLab = "Seguidores", yScaleUnity = "m", yScaleRound = 1e-6, median(atvd4$seg), atvd4)
+plot2 = get_plot_qst_4(atvd5$atvd, title = "Atividade",  yLab = "Tweets", yScaleUnity = "k", yScaleRound = 1e-3, median(atvd5$atvd), atvd5)
+plot3 = get_plot_qst_4(atvd6$engaj, title = "Engajamento", yLab = "Curtidas e Retweets", yScaleUnity = "m", yScaleRound = 1e-6, median(atvd6$engaj), atvd6)
+
+grid.arrange(plot1, plot2, plot3, ncol=3)
+```
+
+Aqui, o partido com maior atividade (PT) fica apenas em segundo lugar em engajamento, com apenas metade do primeiro colocado (PSL), e apenas em quarto lugar no número de seguidores. O PSOL, por outro lado, com pouco mais da metade dos seguidores do PODE, consegue criar bem mais engajamento, mesmo com menor atividade. Diferente do cenário considerando os parlamentares separadamente, não podemos concluir muita coisa observando os partidos.
